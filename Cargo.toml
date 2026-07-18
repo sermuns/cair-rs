@@ -11,6 +11,9 @@ members = ["examples/*"]
 edition = "2024"
 
 [workspace.dependencies]
+anyhow = { version = "1", default-features = false }
 cair.path = "."
+image = "0.25"
 
 [dependencies]
+image.workspace = true

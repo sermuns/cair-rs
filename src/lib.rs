@@ -1,14 +1,25 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+#![no_std]
+
+use image::{GenericImage, GenericImageView, RgbImage};
+
+pub fn compute_gradient_x_of_image(img: &RgbImage, grad_x: &mut RgbImage) {
+    for (_, row) in grad_x.enumerate_rows_mut() {
+        for (x, y, pixel) in row {
+            pixel.0 = [0xff, 0xff, 0x00];
+        }
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub fn compute_gradient_y_of_image(img: &RgbImage, grad_x: &mut RgbImage) {}
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+pub fn compute_energy_of_image(grad_x: &RgbImage, grad_y: &RgbImage, out: &mut RgbImage) {
+    for (x, y, pixel) in out.enumerate_pixels_mut() {}
+}
+
+pub fn establish_matching_relations() {
+    todo!()
+}
+
+pub fn compute_energy_of_seam() {
+    todo!()
 }

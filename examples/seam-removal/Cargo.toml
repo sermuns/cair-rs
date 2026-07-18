@@ -4,4 +4,6 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+anyhow.workspace = true
 cair.workspace = true
+image.workspace = true
