@@ -1,6 +1,16 @@
 [package]
-name = "cair-rs"
+name = "cair"
 version = "0.1.0"
+edition.workspace = true
+
+[workspace]
+resolver = "3"
+members = ["examples/*"]
+
+[workspace.package]
 edition = "2024"
+
+[workspace.dependencies]
+cair.path = "."
 
 [dependencies]

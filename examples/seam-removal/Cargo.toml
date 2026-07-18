@@ -1,0 +1,7 @@
+[package]
+name = "seam-removal"
+edition.workspace = true
+publish = false
+
+[dependencies]
+cair.workspace = true
