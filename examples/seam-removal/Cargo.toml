@@ -6,4 +6,4 @@ publish = false
 [dependencies]
 anyhow.workspace = true
 cair.workspace = true
-image.workspace = true
+image = { workspace = true, default-features = true }
