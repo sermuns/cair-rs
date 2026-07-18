@@ -14,13 +14,13 @@ fn main() -> anyhow::Result<()> {
 
     let before = Instant::now();
 
-    let mut grad_x = RgbImage::new(width, height);
-    compute_gradient_x_of_image(&img, &mut grad_x);
-    let mut grad_y = RgbImage::new(width, height);
-    compute_gradient_y_of_image(&img, &mut grad_y);
+    // let mut grad_x = RgbImage::new(width, height);
+    // compute_gradient_x_of_image(&img, &mut grad_x);
+    // let mut grad_y = RgbImage::new(width, height);
+    // compute_gradient_y_of_image(&img, &mut grad_y);
 
     let mut grad_magnitude = RgbImage::new(width, height);
-    compute_gradient_magnitude(&grad_x, &grad_y, &mut grad_magnitude);
+    compute_gradient_magnitude(&img, &mut grad_magnitude);
 
     println!("computed gradient magnitude in {:?}", before.elapsed());
 
