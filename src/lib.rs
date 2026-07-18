@@ -1,6 +1,9 @@
 #![no_std]
 
-use image::{Rgb, RgbImage};
+extern crate alloc;
+
+use alloc::vec::Vec;
+use image::{GrayImage, Luma, Rgb, RgbImage};
 
 /// Compute vertical gradient (above minus below)
 pub fn compute_gradient_y_of_image(img: &RgbImage, grad_x: &mut RgbImage) {
@@ -51,8 +54,24 @@ pub fn compute_gradient_magnitude(img: &RgbImage, out: &mut RgbImage) {
     }
 }
 
-pub fn establish_matching_relations() {
+/// For every pixel, find optimal corresponding pixel in row below.
+pub fn compute_vertical_matches(energy: &RgbImage) {
     todo!()
+}
+
+pub fn compute_row_edge_weights(energy: &GrayImage) -> GrayImage {
+    let mut weights = GrayImage::new(energy.width(), energy.height());
+
+    for (i, j, pixel) in energy.enumerate_pixels() {
+        weights[(i, j)] = if i.abs_diff(j) <= 1 {
+            let k = j;
+            Luma([energy[(i, k)].0[0] * energy[(j, k + 1)].0[0]])
+        } else {
+            Luma([u8::MIN])
+        }
+    }
+
+    weights
 }
 
 pub fn compute_energy_of_seam() {
