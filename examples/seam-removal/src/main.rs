@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use anyhow::bail;
-use cair::{compute_gradient_magnitude, compute_gradient_x_of_image, compute_gradient_y_of_image};
+use cair::compute_gradient_magnitude;
 use image::{ImageReader, RgbImage};
 
 fn main() -> anyhow::Result<()> {

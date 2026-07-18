@@ -35,7 +35,7 @@ pub fn compute_gradient_x_of_image(img: &RgbImage, grad_y: &mut RgbImage) {
 
 pub fn compute_gradient_magnitude(img: &RgbImage, out: &mut RgbImage) {
     let width = img.width().try_into().unwrap();
-    for (x, y, Rgb([r, g, b])) in out.enumerate_pixels_mut().skip(width) {
+    for (x, y, Rgb(out_rgb)) in out.enumerate_pixels_mut().skip(width) {
         if x == 0 {
             continue;
         }
@@ -44,18 +44,11 @@ pub fn compute_gradient_magnitude(img: &RgbImage, out: &mut RgbImage) {
         let Rgb([above_r, above_g, above_b]) = img[(x, y - 1)];
         let Rgb([here_r, here_g, here_b]) = img[(x, y)];
 
-        *r = (here_r)
-            .saturating_mul(2)
-            .saturating_sub(left_r)
-            .saturating_sub(above_r);
-        *g = (here_g)
-            .saturating_mul(2)
-            .saturating_sub(left_g)
-            .saturating_sub(above_g);
-        *b = (here_b)
-            .saturating_mul(2)
-            .saturating_sub(left_b)
-            .saturating_sub(above_b);
+        *out_rgb = [
+            (here_r.abs_diff(left_r)).saturating_add(here_r.abs_diff(above_r)),
+            (here_g.abs_diff(left_g)).saturating_add(here_g.abs_diff(above_g)),
+            (here_b.abs_diff(left_b)).saturating_add(here_b.abs_diff(above_b)),
+        ];
     }
 }
 
