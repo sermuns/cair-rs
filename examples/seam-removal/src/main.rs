@@ -1,5 +1,5 @@
 use anyhow::bail;
-use cair::compute_gradient_x_of_image;
+use cair::{compute_gradient_magnitude, compute_gradient_x_of_image, compute_gradient_y_of_image};
 use image::{ImageReader, RgbImage};
 
 fn main() -> anyhow::Result<()> {
@@ -8,12 +8,17 @@ fn main() -> anyhow::Result<()> {
     };
 
     let img = ImageReader::open(img_path)?.decode()?.into_rgb8();
+    let (width, height) = img.dimensions();
 
-    let mut grad_x = RgbImage::new(img.width(), img.height());
-
+    let mut grad_x = RgbImage::new(width, height);
     compute_gradient_x_of_image(&img, &mut grad_x);
+    let mut grad_y = RgbImage::new(width, height);
+    compute_gradient_y_of_image(&img, &mut grad_y);
 
-    grad_x.save("out.png")?;
+    let mut grad_magnitude = RgbImage::new(width, height);
+    compute_gradient_magnitude(&grad_x, &grad_y, &mut grad_magnitude);
+
+    grad_magnitude.save("out.png")?;
 
     Ok(())
 }
