@@ -34,9 +34,8 @@ pub fn compute_gradient_x_of_image(img: &RgbImage, grad_y: &mut RgbImage) {
 }
 
 pub fn compute_gradient_magnitude(img: &RgbImage, out: &mut RgbImage) {
-    let width = img.width().try_into().unwrap();
-    for (x, y, Rgb(out_rgb)) in out.enumerate_pixels_mut().skip(width) {
-        if x == 0 {
+    for (x, y, Rgb(out_rgb)) in out.enumerate_pixels_mut() {
+        if x == 0 || y == 0 {
             continue;
         }
 
