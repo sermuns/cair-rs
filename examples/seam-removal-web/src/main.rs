@@ -12,8 +12,8 @@ fn main() {
 
 #[component]
 fn App() -> impl IntoView {
-    let slider_str = RwSignal::new("0".to_string());
-    let slider_value = move || slider_str.get().parse::<u16>().unwrap();
+    let num_vertical_seams_str = RwSignal::new("0".to_string());
+    let num_horizontal_seams_str = RwSignal::new("0".to_string());
 
     let img = image::load_from_memory(include_bytes!("/home/sermuns/Git/cv/media/jag.jpg"))
         .unwrap()
@@ -26,8 +26,8 @@ fn App() -> impl IntoView {
     let energy = DynamicImage::ImageRgb8(grad_magnitude).into_luma8();
 
     let carved_image_data_url = move || {
-        let num_vertical_seams_to_remove = slider_value() as usize;
-        let num_horizontal_seams_to_remove = 0; // TODO:
+        let num_vertical_seams_to_remove = num_vertical_seams_str.get().parse().unwrap();
+        let num_horizontal_seams_to_remove = num_horizontal_seams_str.get().parse().unwrap();
 
         let carved = remove_seams(
             &img,
@@ -45,16 +45,22 @@ fn App() -> impl IntoView {
     };
 
     view! {
-        <input
-            type="range"
-            bind:value=slider_str
-            min=0
-            max=width-1
-        />
-        <p>
-            {slider_value}
-        </p>
+        <main>
+        <h1>{env!("CARGO_PKG_NAME")}</h1>
+
+        <div id="grid">
+            <input type="range" bind:value=num_vertical_seams_str min=0 max=width - 1 />
+            "num vertical seams to remove:" {num_vertical_seams_str}
+            <input type="range" bind:value=num_horizontal_seams_str min=0 max=height - 1 />
+            "num horizontal seams to remove:" {num_horizontal_seams_str}
+        </div>
 
         <img src=carved_image_data_url />
+
+        </main>
+
+        <footer>
+            <a href="https://github.com/sermuns/cair-rs/tree/main/examples/seam-removal-web">"source code"</a>
+        </footer>
     }
 }

@@ -1,0 +1,43 @@
+:root {
+	--accent-color: hsl(0, 100%, 85%);
+	--background-color: hsl(0, 10%, 18%);
+	--foreground-color: hsl(0, 10%, 95%);
+
+	background-color: var(--background-color);
+	color: var(--foreground-color);
+
+	font-family: "JetBrains Mono", monospace;
+}
+
+body {
+	box-sizing: border-box;
+	min-height: 100vh;
+	margin: 0;
+	padding: 1rem;
+	gap: 1rem;
+	display: flex;
+	flex-direction: column;
+}
+
+main {
+	flex: 1;
+}
+
+img {
+	max-width: 100%;
+	display: block;
+	margin: auto;
+}
+
+footer {
+	text-align: center;
+}
+
+a {
+	color: var(--accent-color);
+}
+
+#grid {
+	display: grid;
+	grid-template-columns: 1fr auto;
+}

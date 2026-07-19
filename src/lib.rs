@@ -6,39 +6,6 @@ extern crate alloc;
 use alloc::vec::Vec;
 use image::{GrayImage, ImageBuffer, Luma, Rgb, RgbImage};
 
-/*
-/// Compute vertical gradient (above minus below)
-pub fn compute_gradient_y_of_image(img: &RgbImage, grad_x: &mut RgbImage) {
-    for (x, y, Rgb([r, g, b])) in grad_x
-        .enumerate_pixels_mut()
-        .skip(img.width().try_into().unwrap())
-    {
-        let Rgb([above_r, above_g, above_b]) = img[(x, y - 1)];
-        let Rgb([here_r, here_g, here_b]) = img[(x, y)];
-
-        *r = above_r.saturating_sub(here_r);
-        *g = above_g.saturating_sub(here_g);
-        *b = above_b.saturating_sub(here_b);
-    }
-}
-
-/// Compute horizontal gradient (left minus right)
-pub fn compute_gradient_x_of_image(img: &RgbImage, grad_y: &mut RgbImage) {
-    for (x, y, Rgb([r, g, b])) in grad_y.enumerate_pixels_mut() {
-        if x == 0 {
-            continue;
-        }
-
-        let Rgb([left_r, left_g, left_b]) = img[(x - 1, y)];
-        let Rgb([here_r, here_g, here_b]) = img[(x, y)];
-
-        *r = left_r.saturating_sub(here_r);
-        *g = left_g.saturating_sub(here_g);
-        *b = left_b.saturating_sub(here_b);
-    }
-}
-*/
-
 pub fn compute_gradient_magnitude(img: &RgbImage, out: &mut RgbImage) {
     for (x, y, Rgb(out_rgb)) in out.enumerate_pixels_mut() {
         if x == 0 || y == 0 {
@@ -122,68 +89,70 @@ pub enum SeamDirection {
     Horizontal,
 }
 
-pub fn remove_seams(
-    img: &RgbImage,
-    energy: &GrayImage,
-    num_horizontal_seams_to_remove: usize,
-    num_vertical_seams_to_remove: usize,
-) -> RgbImage {
-    let width = img.width() as usize;
-    let height = img.height() as usize;
-    assert_eq!(width, energy.width() as usize);
-    assert_eq!(height, energy.height() as usize);
-    assert!(num_vertical_seams_to_remove < width);
-    assert!(num_horizontal_seams_to_remove < height);
+fn set_removed(
+    e: &Vec<Vec<f32>>,
+    orig_width: usize,
+    orig_height: usize,
+    num_seams_to_remove: usize,
+    seam_direction: SeamDirection,
+    removed_mask: &mut Vec<Vec<bool>>,
+) {
+    let (rows, cols) = match seam_direction {
+        SeamDirection::Vertical => (orig_height, orig_width),
+        SeamDirection::Horizontal => (orig_width, orig_height), // HACK: transposed
+    };
+    let get_energy = |r: usize, c: usize| {
+        match seam_direction {
+            SeamDirection::Vertical => e[r][c],
+            SeamDirection::Horizontal => e[c][r], // HACK: transposed
+        }
+    };
 
-    let mut e = vec![vec![0.; width]; height];
-    for (x, y, Luma([value])) in energy.enumerate_pixels() {
-        e[y as usize][x as usize] = (*value) as f32;
+    let mut m_matrix = vec![vec![0.; cols]; rows];
+    for c in 0..cols {
+        m_matrix[rows - 1][c] = get_energy(rows - 1, c);
     }
 
-    let mut m_matrix = vec![vec![0.; width]; height];
-    for x in 0..width {
-        m_matrix[height - 1][x] = e[height - 1][x];
-    }
-    for y in (0..height - 1).rev() {
-        for x in 0..width {
-            let mut min_next = m_matrix[y + 1][x];
-            if x > 0 {
-                min_next = min_next.min(m_matrix[y + 1][x - 1]);
+    for r in (0..rows - 1).rev() {
+        for c in 0..cols {
+            let mut min_next = m_matrix[r + 1][c];
+            if c > 0 {
+                min_next = min_next.min(m_matrix[r + 1][c - 1]);
             }
-            if x < width - 1 {
-                min_next = min_next.min(m_matrix[y + 1][x + 1]);
+            if c < cols - 1 {
+                min_next = min_next.min(m_matrix[r + 1][c + 1]);
             }
-            m_matrix[y][x] = e[y][x] + min_next;
+            m_matrix[r][c] = get_energy(r, c) + min_next;
         }
     }
 
-    let mut a_matrix = vec![vec![0.0; width]; height];
-    for x in 0..width {
-        a_matrix[0][x] = e[0][x];
+    let mut a_matrix = vec![vec![0.0; cols]; rows];
+    for c in 0..cols {
+        a_matrix[0][c] = get_energy(0, c);
     }
 
-    let mut parent_map = vec![vec![0; width]; height];
+    let mut parent_map = vec![vec![0; cols]; rows];
 
-    for y in 0..height - 1 {
-        let row_matches = match_adjacent(&a_matrix[y], &m_matrix[y + 1]);
+    for r in 0..rows - 1 {
+        let matches = match_adjacent(&a_matrix[r], &m_matrix[r + 1]);
 
-        for x in 0..width {
-            let matched_x = row_matches[x];
-            a_matrix[y + 1][matched_x] = a_matrix[y][x] + e[y + 1][matched_x];
-            parent_map[y + 1][matched_x] = x;
+        for c in 0..cols {
+            let matched_c = matches[c];
+            a_matrix[r + 1][matched_c] = a_matrix[r][c] + get_energy(r + 1, matched_c);
+            parent_map[r + 1][matched_c] = c;
         }
     }
 
-    let mut seams = Vec::with_capacity(width);
-    for start_x in 0..width {
-        let mut path = vec![0; height];
-        let mut current_x = start_x;
-        let total_energy = a_matrix[height - 1][start_x];
+    let mut seams = Vec::with_capacity(cols);
+    for start_c in 0..cols {
+        let mut path = vec![0; rows];
+        let mut current_c = start_c;
+        let total_energy = a_matrix[rows - 1][start_c];
 
-        for y in (0..height).rev() {
-            path[y] = current_x;
-            if y > 0 {
-                current_x = parent_map[y][current_x];
+        for r in (0..rows).rev() {
+            path[r] = current_c;
+            if r > 0 {
+                current_c = parent_map[r][current_c];
             }
         }
         seams.push((total_energy, path));
@@ -191,27 +160,93 @@ pub fn remove_seams(
 
     seams.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
-    let mut removed_mask = vec![vec![false; width]; height];
-    for i in 0..num_vertical_seams_to_remove {
-        let (_, path) = &seams[i];
-        for y in 0..height {
-            removed_mask[y][path[y]] = true;
-        }
-    }
-
-    let new_width = width - num_vertical_seams_to_remove;
-    let new_height = height - num_horizontal_seams_to_remove;
-    let mut output_img = ImageBuffer::new(new_width as u32, new_height as u32);
-
-    for y in 0..height {
-        let mut out_x = 0;
-        for x in 0..width {
-            if !removed_mask[y][x] {
-                let pixel = img[(x as u32, y as u32)];
-                output_img.put_pixel(out_x as u32, y as u32, pixel);
-                out_x += 1;
+    for path in seams.iter().map(|(_, path)| path).take(num_seams_to_remove) {
+        for (r, c) in path.iter().enumerate().take(rows) {
+            match seam_direction {
+                SeamDirection::Vertical => {
+                    removed_mask[r][*c] = true;
+                }
+                SeamDirection::Horizontal => {
+                    removed_mask[*c][r] = true;
+                }
             }
         }
+    }
+}
+
+// TODO: less alloc
+pub fn remove_seams(
+    img: &RgbImage,
+    energy: &GrayImage,
+    num_horizontal_seams_to_remove: usize,
+    num_vertical_seams_to_remove: usize,
+) -> RgbImage {
+    let mut output_img = img.clone();
+
+    let mut e = vec![vec![0.; img.width() as usize]; img.height() as usize];
+    for (x, y, Luma([value])) in energy.enumerate_pixels() {
+        e[y as usize][x as usize] = (*value) as f32;
+    }
+
+    if num_vertical_seams_to_remove > 0 {
+        let width = output_img.width() as usize;
+        let height = output_img.height() as usize;
+        let mut should_be_removed = vec![vec![false; width]; height];
+
+        set_removed(
+            &e,
+            width,
+            height,
+            num_vertical_seams_to_remove,
+            SeamDirection::Vertical,
+            &mut should_be_removed,
+        );
+
+        let new_width = width - num_vertical_seams_to_remove;
+        let mut carved_img = ImageBuffer::new(new_width as u32, height as u32);
+        let mut carved_e = vec![vec![0.0; new_width]; height];
+
+        for y in 0..height {
+            let mut out_x = 0;
+            for x in 0..width {
+                if !should_be_removed[y][x] && out_x < new_width {
+                    carved_img.put_pixel(out_x as u32, y as u32, output_img[(x as u32, y as u32)]);
+                    carved_e[y][out_x] = e[y][x];
+                    out_x += 1;
+                }
+            }
+        }
+        output_img = carved_img;
+        e = carved_e;
+    }
+
+    if num_horizontal_seams_to_remove > 0 {
+        let width = output_img.width() as usize;
+        let height = output_img.height() as usize;
+        let mut should_be_removed = vec![vec![false; width]; height];
+
+        set_removed(
+            &e,
+            width,
+            height,
+            num_horizontal_seams_to_remove,
+            SeamDirection::Horizontal,
+            &mut should_be_removed,
+        );
+
+        let new_height = height - num_horizontal_seams_to_remove;
+        let mut carved_img = ImageBuffer::new(width as u32, new_height as u32);
+
+        for x in 0..width {
+            let mut out_y = 0;
+            for y in 0..height {
+                if !should_be_removed[y][x] && out_y < new_height {
+                    carved_img.put_pixel(x as u32, out_y as u32, output_img[(x as u32, y as u32)]);
+                    out_y += 1;
+                }
+            }
+        }
+        output_img = carved_img;
     }
 
     output_img
