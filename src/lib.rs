@@ -1,10 +1,12 @@
 #![no_std]
 
+#[macro_use]
 extern crate alloc;
 
 use alloc::vec::Vec;
-use image::{GrayImage, Luma, Rgb, RgbImage};
+use image::{GrayImage, ImageBuffer, Rgb, RgbImage};
 
+/*
 /// Compute vertical gradient (above minus below)
 pub fn compute_gradient_y_of_image(img: &RgbImage, grad_x: &mut RgbImage) {
     for (x, y, Rgb([r, g, b])) in grad_x
@@ -35,6 +37,7 @@ pub fn compute_gradient_x_of_image(img: &RgbImage, grad_y: &mut RgbImage) {
         *b = left_b.saturating_sub(here_b);
     }
 }
+*/
 
 pub fn compute_gradient_magnitude(img: &RgbImage, out: &mut RgbImage) {
     for (x, y, Rgb(out_rgb)) in out.enumerate_pixels_mut() {
@@ -54,26 +57,154 @@ pub fn compute_gradient_magnitude(img: &RgbImage, out: &mut RgbImage) {
     }
 }
 
-/// For every pixel, find optimal corresponding pixel in row below.
-pub fn compute_vertical_matches(energy: &RgbImage) {
-    todo!()
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum MatchDirection {
+    Straight,
+    Cross,
 }
 
-pub fn compute_row_edge_weights(energy: &GrayImage) -> GrayImage {
-    let mut weights = GrayImage::new(energy.width(), energy.height());
+fn match_adjacent_rows(row_k_a: &[f32], row_kp1_m: &[f32]) -> Vec<usize> {
+    let m = row_k_a.len();
+    assert_eq!(m, row_kp1_m.len());
 
-    for (i, j, pixel) in energy.enumerate_pixels() {
-        weights[(i, j)] = if i.abs_diff(j) <= 1 {
-            let k = j;
-            Luma([energy[(i, k)].0[0] * energy[(j, k + 1)].0[0]])
+    let w = |i: usize, j: usize| -> f32 {
+        if (i as isize - j as isize).abs() <= 1 {
+            row_k_a[i] * row_kp1_m[j]
         } else {
-            Luma([u8::MIN])
+            f32::NEG_INFINITY
+        }
+    };
+
+    let mut f = vec![0.0; m + 1];
+    let mut choices = vec![MatchDirection::Straight; m + 1];
+
+    for i in 1..=m {
+        let f1 = f[i - 1] + w(i - 1, i - 1);
+
+        let f2 = if i >= 2 {
+            f[i - 2] + w(i - 1, i - 2) + w(i - 2, i - 1)
+        } else {
+            f32::NEG_INFINITY
+        };
+
+        if f1 >= f2 {
+            f[i] = f1;
+            choices[i] = MatchDirection::Straight;
+        } else {
+            f[i] = f2;
+            choices[i] = MatchDirection::Cross;
         }
     }
 
-    weights
+    let mut matches = vec![0; m];
+    let mut i = m;
+    while i > 0 {
+        match choices[i] {
+            MatchDirection::Straight => {
+                matches[i - 1] = i - 1;
+                i -= 1;
+            }
+            MatchDirection::Cross => {
+                matches[i - 1] = i - 2;
+                matches[i - 2] = i - 1;
+                i -= 2;
+            }
+        }
+    }
+
+    matches
 }
 
-pub fn compute_energy_of_seam() {
-    todo!()
+pub fn remove_seams_rgb(
+    original_image: &RgbImage,
+    energy_image: &GrayImage,
+    num_seams_to_remove: usize,
+) -> RgbImage {
+    let width = original_image.width() as usize;
+    let height = original_image.height() as usize;
+    assert_eq!(width, energy_image.width() as usize);
+    assert_eq!(height, energy_image.height() as usize);
+    assert!(num_seams_to_remove < width);
+
+    let mut e = vec![vec![0.0; width]; height];
+    for y in 0..height {
+        for x in 0..width {
+            e[y][x] = energy_image.get_pixel(x as u32, y as u32)[0] as f32;
+        }
+    }
+
+    let mut m_matrix = vec![vec![0.0; width]; height];
+    for x in 0..width {
+        m_matrix[height - 1][x] = e[height - 1][x];
+    }
+    for y in (0..height - 1).rev() {
+        for x in 0..width {
+            let mut min_next = m_matrix[y + 1][x];
+            if x > 0 {
+                min_next = min_next.min(m_matrix[y + 1][x - 1]);
+            }
+            if x < width - 1 {
+                min_next = min_next.min(m_matrix[y + 1][x + 1]);
+            }
+            m_matrix[y][x] = e[y][x] + min_next;
+        }
+    }
+
+    let mut a_matrix = vec![vec![0.0; width]; height];
+    for x in 0..width {
+        a_matrix[0][x] = e[0][x];
+    }
+
+    let mut parent_map = vec![vec![0; width]; height];
+
+    for y in 0..height - 1 {
+        let row_matches = match_adjacent_rows(&a_matrix[y], &m_matrix[y + 1]);
+
+        for x in 0..width {
+            let matched_x = row_matches[x];
+            a_matrix[y + 1][matched_x] = a_matrix[y][x] + e[y + 1][matched_x];
+            parent_map[y + 1][matched_x] = x;
+        }
+    }
+
+    let mut seams = Vec::with_capacity(width);
+    for start_x in 0..width {
+        let mut path = vec![0; height];
+        let mut current_x = start_x;
+        let total_energy = a_matrix[height - 1][start_x];
+
+        for y in (0..height).rev() {
+            path[y] = current_x;
+            if y > 0 {
+                current_x = parent_map[y][current_x];
+            }
+        }
+        seams.push((total_energy, path));
+    }
+
+    seams.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+    let mut removed_mask = vec![vec![false; width]; height];
+    for i in 0..num_seams_to_remove {
+        let (_, path) = &seams[i];
+        for y in 0..height {
+            removed_mask[y][path[y]] = true;
+        }
+    }
+
+    let new_width = width - num_seams_to_remove;
+    let mut output_img = ImageBuffer::new(new_width as u32, height as u32);
+
+    for y in 0..height {
+        let mut out_x = 0;
+        for x in 0..width {
+            if !removed_mask[y][x] {
+                let pixel = original_image.get_pixel(x as u32, y as u32);
+                output_img.put_pixel(out_x as u32, y as u32, *pixel);
+                out_x += 1;
+            }
+        }
+    }
+
+    output_img
 }

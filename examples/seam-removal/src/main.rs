@@ -1,8 +1,8 @@
 use std::time::Instant;
 
 use anyhow::bail;
-use cair::compute_gradient_magnitude;
-use image::{ImageReader, RgbImage};
+use cair::{compute_gradient_magnitude, remove_seams_rgb};
+use image::{DynamicImage, ImageReader, RgbImage};
 
 fn main() -> anyhow::Result<()> {
     let Some(img_path) = std::env::args().nth(1) else {
@@ -24,7 +24,15 @@ fn main() -> anyhow::Result<()> {
 
     println!("computed gradient magnitude in {:?}", before.elapsed());
 
-    grad_magnitude.save("out.png")?;
+    let before = Instant::now();
+
+    let energy = DynamicImage::ImageRgb8(grad_magnitude).into_luma8();
+
+    let carved = remove_seams_rgb(&img, &energy, 200);
+
+    println!("removed seams in {:?}", before.elapsed());
+
+    carved.save("out.png")?;
 
     Ok(())
 }
