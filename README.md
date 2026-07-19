@@ -1,5 +1,9 @@
 # Rust library for CAIR (content aware image resizing)
 
+https://github.com/user-attachments/assets/b69c5e4d-6f67-4c14-9c01-10b2e730a05b
+
+[try the web demo](https://cair.samake.se)
+
 ## TODO
 
 - [ ] explore adding `rayon` feature (probably faster but who knows?)
