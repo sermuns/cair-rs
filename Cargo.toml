@@ -9,6 +9,7 @@ members = ["examples/*"]
 
 [workspace.package]
 edition = "2024"
+license = "WTFPL"
 
 [workspace.dependencies]
 anyhow = { version = "1", default-features = false }

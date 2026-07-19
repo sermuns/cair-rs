@@ -1,6 +1,7 @@
 [package]
 name = "seam-removal-cli"
 edition.workspace = true
+license.workspace = true
 publish = false
 
 [dependencies]
