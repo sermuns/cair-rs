@@ -1,0 +1,35 @@
+name: Publish web example
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # to use actions/deploy-pages
+      pages: write # to push to a github pages site
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: trunk
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: |
+          cd examples/seam-removal-web
+          trunk build --release --minify
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: examples/seam-removal-web/dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v5
