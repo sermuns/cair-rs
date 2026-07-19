@@ -1,2 +1,2 @@
 serve:
-    RUSTFLAGS="--cfg erase_components" trunk serve -w ../..
+    RUSTFLAGS="--cfg erase_components" trunk serve -w ../.. -i dist
