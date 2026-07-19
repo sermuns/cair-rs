@@ -4,7 +4,7 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use image::{GrayImage, ImageBuffer, Rgb, RgbImage};
+use image::{GrayImage, ImageBuffer, Luma, Rgb, RgbImage};
 
 /*
 /// Compute vertical gradient (above minus below)
@@ -63,22 +63,24 @@ enum MatchDirection {
     Cross,
 }
 
-fn match_adjacent_rows(row_k_a: &[f32], row_kp1_m: &[f32]) -> Vec<usize> {
-    let m = row_k_a.len();
-    assert_eq!(m, row_kp1_m.len());
+// TODO: Stop allocating. Take mut ref to slice(s) instead!
+/// Works for both vertical/horizontal
+fn match_adjacent(row_or_column_k_a: &[f32], row_or_column_kp1_m: &[f32]) -> Vec<usize> {
+    let m_or_n = row_or_column_k_a.len();
+    assert_eq!(m_or_n, row_or_column_kp1_m.len());
 
     let w = |i: usize, j: usize| -> f32 {
         if (i as isize - j as isize).abs() <= 1 {
-            row_k_a[i] * row_kp1_m[j]
+            row_or_column_k_a[i] * row_or_column_kp1_m[j]
         } else {
             f32::NEG_INFINITY
         }
     };
 
-    let mut f = vec![0.0; m + 1];
-    let mut choices = vec![MatchDirection::Straight; m + 1];
+    let mut f = vec![0.0; m_or_n + 1];
+    let mut choices = vec![MatchDirection::Straight; m_or_n + 1];
 
-    for i in 1..=m {
+    for i in 1..=m_or_n {
         let f1 = f[i - 1] + w(i - 1, i - 1);
 
         let f2 = if i >= 2 {
@@ -96,8 +98,8 @@ fn match_adjacent_rows(row_k_a: &[f32], row_kp1_m: &[f32]) -> Vec<usize> {
         }
     }
 
-    let mut matches = vec![0; m];
-    let mut i = m;
+    let mut matches = vec![0; m_or_n];
+    let mut i = m_or_n;
     while i > 0 {
         match choices[i] {
             MatchDirection::Straight => {
@@ -115,25 +117,30 @@ fn match_adjacent_rows(row_k_a: &[f32], row_kp1_m: &[f32]) -> Vec<usize> {
     matches
 }
 
-pub fn remove_seams_rgb(
-    original_image: &RgbImage,
-    energy_image: &GrayImage,
-    num_seams_to_remove: usize,
-) -> RgbImage {
-    let width = original_image.width() as usize;
-    let height = original_image.height() as usize;
-    assert_eq!(width, energy_image.width() as usize);
-    assert_eq!(height, energy_image.height() as usize);
-    assert!(num_seams_to_remove < width);
+pub enum SeamDirection {
+    Vertical,
+    Horizontal,
+}
 
-    let mut e = vec![vec![0.0; width]; height];
-    for y in 0..height {
-        for x in 0..width {
-            e[y][x] = energy_image.get_pixel(x as u32, y as u32)[0] as f32;
-        }
+pub fn remove_seams(
+    img: &RgbImage,
+    energy: &GrayImage,
+    num_horizontal_seams_to_remove: usize,
+    num_vertical_seams_to_remove: usize,
+) -> RgbImage {
+    let width = img.width() as usize;
+    let height = img.height() as usize;
+    assert_eq!(width, energy.width() as usize);
+    assert_eq!(height, energy.height() as usize);
+    assert!(num_vertical_seams_to_remove < width);
+    assert!(num_horizontal_seams_to_remove < height);
+
+    let mut e = vec![vec![0.; width]; height];
+    for (x, y, Luma([value])) in energy.enumerate_pixels() {
+        e[y as usize][x as usize] = (*value) as f32;
     }
 
-    let mut m_matrix = vec![vec![0.0; width]; height];
+    let mut m_matrix = vec![vec![0.; width]; height];
     for x in 0..width {
         m_matrix[height - 1][x] = e[height - 1][x];
     }
@@ -158,7 +165,7 @@ pub fn remove_seams_rgb(
     let mut parent_map = vec![vec![0; width]; height];
 
     for y in 0..height - 1 {
-        let row_matches = match_adjacent_rows(&a_matrix[y], &m_matrix[y + 1]);
+        let row_matches = match_adjacent(&a_matrix[y], &m_matrix[y + 1]);
 
         for x in 0..width {
             let matched_x = row_matches[x];
@@ -167,7 +174,7 @@ pub fn remove_seams_rgb(
         }
     }
 
-    let mut seams = Vec::with_capacity(width);
+    let mut vertical_seams = Vec::with_capacity(width);
     for start_x in 0..width {
         let mut path = vec![0; height];
         let mut current_x = start_x;
@@ -179,27 +186,28 @@ pub fn remove_seams_rgb(
                 current_x = parent_map[y][current_x];
             }
         }
-        seams.push((total_energy, path));
+        vertical_seams.push((total_energy, path));
     }
 
-    seams.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    vertical_seams.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
     let mut removed_mask = vec![vec![false; width]; height];
-    for i in 0..num_seams_to_remove {
-        let (_, path) = &seams[i];
+    for i in 0..num_vertical_seams_to_remove {
+        let (_, path) = &vertical_seams[i];
         for y in 0..height {
             removed_mask[y][path[y]] = true;
         }
     }
 
-    let new_width = width - num_seams_to_remove;
-    let mut output_img = ImageBuffer::new(new_width as u32, height as u32);
+    let new_width = width - num_vertical_seams_to_remove;
+    let new_height = height - num_horizontal_seams_to_remove;
+    let mut output_img = ImageBuffer::new(new_width as u32, new_height as u32);
 
     for y in 0..height {
         let mut out_x = 0;
         for x in 0..width {
             if !removed_mask[y][x] {
-                let pixel = original_image.get_pixel(x as u32, y as u32);
+                let pixel = img.get_pixel(x as u32, y as u32);
                 output_img.put_pixel(out_x as u32, y as u32, *pixel);
                 out_x += 1;
             }

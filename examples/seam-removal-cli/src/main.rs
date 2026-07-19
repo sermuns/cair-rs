@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use anyhow::bail;
-use cair::{compute_gradient_magnitude, remove_seams_rgb};
+use cair::{compute_gradient_magnitude, remove_seams};
 use image::{DynamicImage, ImageReader, RgbImage};
 
 fn main() -> anyhow::Result<()> {
@@ -28,7 +28,7 @@ fn main() -> anyhow::Result<()> {
 
     let energy = DynamicImage::ImageRgb8(grad_magnitude).into_luma8();
 
-    let carved = remove_seams_rgb(&img, &energy, 200);
+    let carved = remove_seams(&img, &energy, 200);
 
     println!("removed seams in {:?}", before.elapsed());
 

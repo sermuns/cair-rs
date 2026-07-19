@@ -1,9 +1,9 @@
 [package]
-name = "seam-removal"
+name = "seam-removal-cli"
 edition.workspace = true
 publish = false
 
 [dependencies]
 anyhow.workspace = true
 cair.workspace = true
-image = { workspace = true, default-features = true }
+image = { workspace = true, features = ["default-formats"] }
