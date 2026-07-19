@@ -7,4 +7,5 @@ publish = false
 [dependencies]
 anyhow.workspace = true
 cair.workspace = true
+clap = { version = "4", features = ["derive"] }
 image = { workspace = true, features = ["default-formats"] }
