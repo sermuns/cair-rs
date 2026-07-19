@@ -1,4 +1,4 @@
-# Rust library for Content Aware Image Resizing
+# Rust library for CAIR (content aware image resizing)
 
 ## TODO
 
