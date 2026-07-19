@@ -174,7 +174,7 @@ pub fn remove_seams(
         }
     }
 
-    let mut vertical_seams = Vec::with_capacity(width);
+    let mut seams = Vec::with_capacity(width);
     for start_x in 0..width {
         let mut path = vec![0; height];
         let mut current_x = start_x;
@@ -186,14 +186,14 @@ pub fn remove_seams(
                 current_x = parent_map[y][current_x];
             }
         }
-        vertical_seams.push((total_energy, path));
+        seams.push((total_energy, path));
     }
 
-    vertical_seams.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    seams.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
     let mut removed_mask = vec![vec![false; width]; height];
     for i in 0..num_vertical_seams_to_remove {
-        let (_, path) = &vertical_seams[i];
+        let (_, path) = &seams[i];
         for y in 0..height {
             removed_mask[y][path[y]] = true;
         }
