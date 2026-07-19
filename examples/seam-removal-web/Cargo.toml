@@ -10,3 +10,7 @@ console_error_panic_hook = "0.1"
 data-encoding = "2"
 image = { workspace = true, features = ["default-formats"] }
 leptos = { version = "0.8", features = ["csr"] }
+web-sys = {
+  version = "0.3",
+  features = ["Blob", "File", "FileList", "HtmlInputElement"]
+}
