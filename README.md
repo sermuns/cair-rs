@@ -1,5 +1,11 @@
 # Rust library for Content Aware Image Resizing
 
+## TODO
+
+- [ ] explore adding `rayon` feature (probably faster but who knows?)
+- [ ] add benchmark tests
+- [ ] add object retention mask thingy
+
 ## Resources
 
 - wikipedia: <https://en.wikipedia.org/wiki/Seam_carving>
