@@ -207,8 +207,8 @@ pub fn remove_seams(
         let mut out_x = 0;
         for x in 0..width {
             if !removed_mask[y][x] {
-                let pixel = img.get_pixel(x as u32, y as u32);
-                output_img.put_pixel(out_x as u32, y as u32, *pixel);
+                let pixel = img[(x as u32, y as u32)];
+                output_img.put_pixel(out_x as u32, y as u32, pixel);
                 out_x += 1;
             }
         }
